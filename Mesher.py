@@ -41,26 +41,27 @@ def hex_to_cart(hex_coords) -> (list, list):
     return x_coords, y_coords
 
 
-def plot_hex(elements, cols=None) -> None:
+def plot_hex(elements, active=None) -> None:
     """
     Plots a hex grid with color and label overlay. Conversion of hexagon to
     cartesian coordinates.
     :param elements: dict
         dictionary of hex elements
-    :param cols: dict
+    :param active: dict
         dictionary of active elements, must be same length as elements
     :return: None
     """
-    # handle missing colours
-    if not cols:
-        cols = ["blue"] * len(elements)
+    # handle colours
+    if not active:
+        color_map = []
+        color_map = ["red"] * len(elements)
     else:
-        for elem, active in cols.items():
-            if active:
-                cols[elem] = "blue"
+        color_map = []
+        for elem, act in active.items():
+            if act:
+                color_map.append('blue')
             else:
-                cols[elem] = "red"
-        cols = cols.values()
+                color_map.append('red')
 
     # create lable and coord  list
     lables = elements.keys()
@@ -73,13 +74,12 @@ def plot_hex(elements, cols=None) -> None:
     fig, ax = plt.subplots(1)
     ax.set_aspect('equal')
 
-    for x, y, c, l in zip(x_coords, y_coords, cols, lables):
-        colour = c[0].lower() # makes sure that colour is are lower ca
+    for x, y, c, l in zip(x_coords, y_coords, color_map, lables):
         hex = RegularPolygon((x, y),
                              numVertices=6,
                              radius=2. / 3.,
                              orientation=np.radians(30),
-                             facecolor=colour,
+                             facecolor=c,
                              alpha=0.2,
                              edgecolor='k')
 
@@ -88,7 +88,7 @@ def plot_hex(elements, cols=None) -> None:
         ax.text(x, y + 0.2, l, ha='center', va='center', size=20)
 
     # Also add scatter points in hexagon centres
-    ax.scatter(x_coords, y_coords, c=[c[0].lower() for c in cols], alpha=0.5)
+    ax.scatter(x_coords, y_coords, c=color_map, alpha=0.5)
 
     plt.show()
 
@@ -175,14 +175,59 @@ def make_hex_network(elements) -> object:
     return G
 
 
-def plot_network(net) -> None:
-    nx.draw(net, with_labels=True)
+def plot_network(net, active=None) -> object:
+    """
+    Plot the network with the subset highlighted.
+    :param active: dict
+        dictionary of active elements, must be same length as elements
+    :param net: object
+        Networkx network object
+    :return: object
+        The network with updated colours
+    """
+    # handle colours
+
+    if not active:
+        color_map = []
+        color_map = ["green"] * len(net)
+    else:
+        color_map = []
+        for node in net:
+            if active[node]:
+                color_map.append('blue')
+            else:
+                color_map.append('red')
+
+    nx.draw(net, node_color=color_map, with_labels=True)
     plt.show()
-    return None
+    return net
+
+
+# ToDo plot network with subset
+def get_active_subnetwork(net, active=None) -> object:
+    """
+    Plot the network with the subset highlighted.
+    :param active: dict
+        dictionary of active elements, must be same length as elements
+    :param net: object
+        Networkx network object
+    :return: object
+        The subnetwork
+    """
+    if not active:
+        subset_nodes = range(len(net))
+    else:
+        subset_nodes = []
+        for node in net:
+            if active[node]:
+                subset_nodes.append(node)
+
+    return net.subgraph(subset_nodes)
+
 
 # ToDo test the active subset for adjacency.
 # ToDo MCMC to find all active subsets Create Generator.
-# ToDo Find acitivity subsets that are adjacent
+# ToDo Find active subsets that are adjacent
 
 
 if __name__ == '__main__':
@@ -192,12 +237,15 @@ if __name__ == '__main__':
 
     active = active_subset_random(myMesh, 0.1)
 
-    plot_hex(
-        myMesh,
-        cols=active
-    )
+    plot_hex(myMesh, active=active)
 
     net = make_hex_network(myMesh)
-    plot_network(net)
+    plot_network(net, active=active)
+
+    subnet = get_active_subnetwork(net, active=active)
+
+    plot_network(subnet)
+
+    print(nx.is_connected(subnet))
 
     print("End Mesher.py")
