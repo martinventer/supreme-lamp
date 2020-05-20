@@ -33,4 +33,3 @@ of 19 choose 4 = 93024
 of 19 choose 5 = 1395360
 of 19 choose 6 = 19535040
     
-    

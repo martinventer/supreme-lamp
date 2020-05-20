@@ -7,8 +7,12 @@ from matplotlib.patches import RegularPolygon
 import networkx as nx
 import itertools
 
-import operator as op
-from functools import reduce
+import collections
+
+
+def test_compare_two_lists(list1, list2) -> bool:
+    print("test")
+    return collections.Counter(list1) == collections.Counter(list2)
 
 
 def make_hex_grid(dimension) -> dict:
@@ -57,7 +61,7 @@ def plot_hex(elements, active=None) -> None:
     """
     # handle colours
     if not active:
-        color_map = ["red"] * len(elements)
+        color_map = ["green"] * len(elements)
     else:
         color_map = []
         for element in elements.keys():
@@ -73,7 +77,7 @@ def plot_hex(elements, active=None) -> None:
     x_coord, y_coord = hex_to_cart(hex_coord)
 
     # process the figure
-    fig, ax = plt.subplots(1)
+    fig, ax = plt.subplots(1, figsize=(12, 12))
     ax.set_aspect('equal')
 
     for x, y, c, l in zip(x_coord, y_coord, color_map, labels):
@@ -95,21 +99,19 @@ def plot_hex(elements, active=None) -> None:
     return None
 
 
-def active_subset_random(grid, bias, depth=3) -> list:
+def active_subset_random(network, depth=3) -> list:
     """
     Creates a dictionary of random active assignments.
     :param depth: int
         the number of active elements to return
-    :param grid: dict
-        hex element dictionary
-    :param bias: float
-        a value between 0.0 and 1.0 indicating the fraction of grid elements
-        that should be active
+    :param network: object
+        Networkx graph
     :return: dict
         a dictionary containing the element id and a boolean indicator of
         activity
     """
-    return np.random.choice(len(grid), size=depth, replace=False).tolist()
+    node_list = list(network.nodes)
+    return np.random.choice(node_list, size=depth, replace=False).tolist()
 
 
 def unique_element_pairs(elements) -> tuple:
@@ -173,11 +175,11 @@ def make_hex_network(elements) -> object:
     return graph
 
 
-def plot_network(network, active=None) -> object:
+def plot_network(network, active=None) -> None:
     """
     Plot the network with the subset highlighted.
-    :param active: dict
-        dictionary of active elements, must be same length as elements
+    :param active: list
+        list of active elements, must be same length as elements
     :param network: object
         NetworkX network object
     :return: object
@@ -189,15 +191,18 @@ def plot_network(network, active=None) -> object:
     else:
         color_map = []
         for node in network:
-            if active[node]:
+            if node in active:
                 color_map.append('blue')
             else:
                 color_map.append('red')
 
+    # process the figure
+    fig, ax = plt.subplots(1, figsize=(12, 12))
+    ax.set_aspect('equal')
     pos = nx.spring_layout(network)
     nx.draw(network, pos=pos, node_color=color_map, with_labels=True)
     plt.show()
-    return network
+    return None
 
 
 def get_active_sub_network(network, active=None) -> object:
@@ -210,14 +215,6 @@ def get_active_sub_network(network, active=None) -> object:
     :return: object
         The sub-network
     """
-    # if not active:
-    #     subset_nodes = range(len(network))
-    # else:
-    #     subset_nodes = []
-    #     for node in network:
-    #         if active[node]:
-    #             subset_nodes.append(node)
-
     return network.subgraph(active)
 
 
@@ -267,7 +264,7 @@ def active_subset_markov_random(network, depth=3, starting_node=None) -> list:
         generates
     """
     if not starting_node:
-        starting_node = nx.center(net)[0]
+        starting_node = nx.center(network)[0]
 
     active_list = [starting_node]
     current_node = starting_node
@@ -301,15 +298,28 @@ def find_all_isomorphs(network, depth=3, runs=100) -> dict:
     isomprphs[0] = [active_subset_markov_random(network, depth=depth)]
     counter = 1
     for _ in range(runs):
-        flag = 0
+        new_morph_flag = True
+        # Generate a new random active set, and sub network
         active_subset = active_subset_markov_random(network, depth=depth)
         new_subnet = get_active_sub_network(network, active=active_subset)
+        # compare the new subnet to the first item in each isomorph
         for idx, isomprph in isomprphs.items():
             target_subnet = get_active_sub_network(network, active=isomprph[0])
+            # if an isomorph exists append this version to that isomprph
             if test_network_isomorphs(new_subnet, target_subnet):
-                isomprphs[idx].append(active_subset)
-                flag = 1
-        if flag == 0:
+                # check for duplicates in the isomorph list
+                duplicate_morph_flag = False
+                for morph in isomprph:
+                    if set(active_subset) == set(morph):
+                        new_morph_flag = False
+                        duplicate_morph_flag = True
+                        break
+
+                if not duplicate_morph_flag:
+                    isomprphs[idx].append(active_subset)
+                    new_morph_flag = False
+        # if an isomorph does not exist create an new dictionary item for it.
+        if new_morph_flag:
             isomprphs[counter] = [active_subset]
             counter += 1
 
@@ -317,54 +327,11 @@ def find_all_isomorphs(network, depth=3, runs=100) -> dict:
 
 
 # ToDo find all unique active subsets Create Generator.
+# ToDo add mesh attributes to the graph.
+# ToDo remove exact duplicates from Isomorph list
 
 
 if __name__ == '__main__':
     print("Start Mesher.py")
-    # np.random.seed(2020)
-
-    # Generate a new hex grid
-    myMesh = make_hex_grid(2)
-    # plot_hex(myMesh)
-
-    # generate an active subset
-    # active1 = active_subset_random(myMesh, 3)
-    # active2 = active_subset_random(myMesh, 3)
-
-
-    # plot hex grid
-    # plot_hex(myMesh, active=active1)
-
-    # create a graph and plot it
-    net = make_hex_network(myMesh)
-    # plot_network(net, active=active1)
-
-    # create a sub-network with only the active elements
-    # subnet1 = get_active_sub_network(net, active=active1)
-    # subnet2 = get_active_sub_network(net, active=active2)
-    # plot_network(subnet1)
-
-    # test that the active set are all connected
-    # print("Is subnet 1 fully connected?", test_network_connectivity(subnet1))
-    # print("Is subnet 2 fully connected?", test_network_connectivity(subnet2))
-
-    # print(nx.is_isomorphic(subnet1, subnet1))
-    # print("Are subnet 1 and subnet 2 isomorphs?",
-    #       test_network_isomorphs(subnet1, subnet2))
-
-    active3 = active_subset_markov_random(net, starting_node=None, depth=2)
-    # plot_hex(myMesh, active=active3)
-
-    isos = find_all_isomorphs(net, depth=4, runs=10)
-    print(isos)
-
-    plot_hex(myMesh)
-
-    # subnet1 = get_active_sub_network(net, active=[9,5])
-    # subnet2 = get_active_sub_network(net, active=[9,10])
-    # print("Are subnet 1 and subnet 2 isomorphs?",
-    #       test_network_isomorphs(subnet1, subnet2))
-    # plot_network(subnet1)
-    # plot_network(subnet2)
 
     print("End Mesher.py")
