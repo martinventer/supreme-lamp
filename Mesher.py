@@ -7,12 +7,7 @@ from matplotlib.patches import RegularPolygon
 import networkx as nx
 import itertools
 
-import collections
-
-
-def test_compare_two_lists(list1, list2) -> bool:
-    print("test")
-    return collections.Counter(list1) == collections.Counter(list2)
+from collections import defaultdict, Counter
 
 
 def make_hex_grid(dimension) -> dict:
@@ -23,7 +18,7 @@ def make_hex_grid(dimension) -> dict:
     :return: dict
         {element_ID: [x-coord, y-coord, z-coord], }
     """
-    coord_list = []
+    coord_list = list()
     for x in range(-1 * dimension, dimension + 1, 1):
         for y in range(-1 * dimension, dimension + 1, 1):
             for z in range(-1 * dimension, dimension + 1, 1):
@@ -63,7 +58,7 @@ def plot_hex(elements, active=None) -> None:
     if not active:
         color_map = ["green"] * len(elements)
     else:
-        color_map = []
+        color_map = list()
         for element in elements.keys():
             if element in active:
                 color_map.append('blue')
@@ -167,10 +162,16 @@ def make_hex_network(elements) -> object:
     """
     pair_gen = unique_element_pairs(elements)
 
+    attrs = dict()
+    for elid, coords in elements.items():
+        attrs[elid] = {'hex_coord': coords}
+
     graph = nx.Graph()
     for edge in pair_gen:
         if test_element_adjacency(elements, edge):
             graph.add_edge(*edge)
+
+    nx.set_node_attributes(graph, attrs)
 
     return graph
 
@@ -189,7 +190,7 @@ def plot_network(network, active=None) -> None:
     if not active:
         color_map = ["green"] * len(network)
     else:
-        color_map = []
+        color_map = list()
         for node in network:
             if node in active:
                 color_map.append('blue')
@@ -280,7 +281,6 @@ def active_subset_markov_random(network, depth=3, starting_node=None) -> list:
     return active_list
 
 
-# TODO compare spatial patterns of isomorphs
 def find_all_isomorphs(network, depth=3, runs=100) -> dict:
     """
     Generate a number of active subsets, evaluate whether they exist as
@@ -326,9 +326,67 @@ def find_all_isomorphs(network, depth=3, runs=100) -> dict:
     return isomprphs
 
 
-# ToDo find all unique active subsets Create Generator.
-# ToDo add mesh attributes to the graph.
-# ToDo remove exact duplicates from Isomorph list
+def test_compare_two_lists(list1, list2) -> bool:
+    """
+    test whether two lists contain the same items
+    :param list1: list
+    :param list2: list
+    :return: bool
+        True if lists are the same otherwise false.
+    """
+    return Counter(list1) == Counter(list2)
+
+
+def hex_rotate_60(coord_list) -> list:
+    """
+    Rotates a hex co-ordinate clockwise 60 degrees
+    :param coord_list: list
+        hex co-ordinate list [x, y, z]
+    :return: list
+        Rotated hex co-ordinate list [x, y, z]
+    """
+    coord_list.insert(0, coord_list.pop())
+    return [-x for x in coord_list]
+
+
+def eid_lookup(hexmesh) -> dict:
+    """
+    creates a lookup table for element ID in a mesh based on their coordinates
+    :param hexmesh: dict
+        a hex mesh dictionary
+    :return: dict
+        Returns dictionary returning the eid in form dict[x][y][z]
+    """
+    # create a defaultdict builder with infinate depth
+    factory = lambda: defaultdict(factory)
+
+    lookup = defaultdict(factory)
+    for eid, coord in hexmesh.items():
+        x, y, z = coord
+        lookup[x][y][z] = eid
+
+    return lookup
+
+
+def rotate_subset(hexmesh, subset) -> list:
+    """
+    Takes a subset and mesh, returns the rotated set
+    :param hexmesh: dict
+        Dictionary containg the full mesh
+    :param subset:  list
+        list of elements in the subset
+    :return: list
+        list of rotated elements
+    """
+    el_map = eid_lookup(hexmesh)
+    rotated_list = list()
+    for element in subset:
+        coord = hexmesh[element].copy()
+        rotated_coord = hex_rotate_60(coord)
+        x, y, z = rotated_coord
+        rotated_list.append(el_map[x][y][z])
+
+    return rotated_list
 
 
 if __name__ == '__main__':
